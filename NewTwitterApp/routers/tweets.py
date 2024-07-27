@@ -1,5 +1,6 @@
-from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, Form
+import shutil
+from typing import Annotated, Optional
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Form, UploadFile, File
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from starlette import status
@@ -58,7 +59,7 @@ async def add_new_tweet(request: Request):
 
 
 @router.post("/add_tweet", response_class=HTMLResponse)
-async def new_tweet(request: Request,  db: db_dependency, new_tweet: str = Form(...)):
+async def new_tweet(request: Request,  db: db_dependency, new_tweet: str = Form(...), file: UploadFile = File(...)):
 
     user = await get_current_user(request)
     if user is None:
@@ -69,6 +70,11 @@ async def new_tweet(request: Request,  db: db_dependency, new_tweet: str = Form(
     tweet_model.liked = False
     tweet_model.owner_id = user.get("id")
     tweet_model.owner = user.get("username")
+
+    contents = await file.read()
+
+    with open(f"./NewTwitterApp/static/images/{file.filename}", "wb") as f:
+        f.write(contents)
 
     db.add(tweet_model)
     db.commit()

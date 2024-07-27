@@ -76,6 +76,21 @@ def authenticate_user(username: str, password: str, db):
     return user
 
 
+async def get_current_user(request: Request):
+    try:
+        token = request.cookies.get("access_token")
+        if token is None:
+            return None
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get('sub')
+        user_id: str = payload.get('id')
+        if username is None or user_id is None:
+            logout(request)
+        return {'username': username, 'id': user_id}
+    except JWTError:
+        raise HTTPException(status_code=404, detail='Not Found')
+
+
 def get_password_hash(password):
     return bcrypt_context.hash(password)
 
@@ -90,20 +105,6 @@ def create_access_token(username: str, user_id: int, role: str, expires_delta: t
     encode.update({'exp': expires})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
-
-async def get_current_user(request: Request):
-    try:
-        token = request.cookies.get("access_token")
-        if token is None:
-            return None
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get('sub')
-        user_id: str = payload.get('id')
-        if username is None or user_id is None:
-            logout(request)
-        return {'username': username, 'id': user_id}
-    except JWTError:
-        raise HTTPException(status_code=404, detail='Not Found')
 
 @router.get("/", response_class=HTMLResponse)
 async def auth_page(request: Request):

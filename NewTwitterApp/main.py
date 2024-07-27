@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from .models import Base
 from .database import engine
-from .routers import auth, tweets, admin, users
-from starlette.staticfiles import StaticFiles
+from .routers import auth, tweets, admin, users, images
+from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse
 from starlette import status
 
@@ -20,3 +20,4 @@ app.include_router(auth.router)
 app.include_router(tweets.router)
 app.include_router(admin.router)
 app.include_router(users.router)
+app.include_router(images.router)
