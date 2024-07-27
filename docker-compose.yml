@@ -1,0 +1,19 @@
+services:
+  fastapi:
+    build: .
+    ports:
+      - "8000:8000"
+
+  db:
+    image: postgres:14.1-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=test1234!
+      - POSTGRES_DB=NewTwitterDatabase
+    volumes:
+      - db_volume:/var/lib/postgresql/data
+      - ./test_volume/:/test_volume/
+
+
+volumes:
+  db_volume:
