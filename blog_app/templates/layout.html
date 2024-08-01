@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" type="text/css"
+          href="{{ url_for('static', path='/todo/css/base.css') }}">
+    <link rel="stylesheet" type="text/css"
+          href="{{ url_for('static', path='/todo/css/bootstrap.css') }}">
+    <link rel="stylesheet" type="text/css"
+          href="{{ url_for('static', path='/todo/css/styles.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>New Twitter App</title>
+</head>
+<body>
+
+{% include 'navbar.html' %}
+
+{% block content %}
+{% endblock %}
+
+<script src="{{ url_for('static', path='/todo/js/jquery-slim.js') }}"></script>
+<script src="{{ url_for('static', path='/todo/js/popper.js') }}"></script>
+<script src="{{ url_for('static', path='/todo/js/bootstrap.js') }}"></script>
+<script>
+    function likeTweet(tweetId) {
+        fetch(`/tweets/like/${tweetId}`)
+            .then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    console.error('Failed to like tweet');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+</script>
+
+<style>
+    .profile-pic-container {
+        width: 40px;
+        height: 40px;
+        overflow: hidden;
+        border-radius: 50%;
+        margin-right: 10px;
+    }
+    .profile-pic {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .tweet-image {
+        width: 100%;
+        max-width: 300px; /* Adjust the max-width as needed */
+        height: auto;
+        object-fit: cover;
+        margin-top: 10px;
+    }
+    .username-link {
+        text-decoration: none;
+        color: inherit;
+    }
+    .username-link:hover {
+        text-decoration: underline;
+    }
+    .end-of-feed {
+        margin-top: 20px;
+        padding: 10px;
+        text-align: center;
+        color: #999;
+    }
+</style>
+
+<style>
+  .button-container {
+    display: flex;
+    gap: 5px; /* Adjust the gap as needed */
+  }
+  .button-container form {
+    margin-bottom: 0;
+  }
+</style>
+
+</body>
+</html>

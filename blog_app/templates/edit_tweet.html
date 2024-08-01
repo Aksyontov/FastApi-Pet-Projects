@@ -1,0 +1,24 @@
+{% include 'layout.html' %}
+
+<div class="container">
+  <div class="card">
+    <div class="card-header">
+      Yeah, in this New Twitter you CAN actually edit tweets
+    </div>
+    <div class="card-body">
+      <form method="POST" action="/tweets/edit_tweet/{{tweet.id}}" style="margin-bottom: 0;">
+        <div class="form-group">
+          <label>Input Text Here</label>
+          <textarea name="new_tweet" class="form-control" rows="3" required>{{tweet.new_tweet}}</textarea>
+        </div>
+        <div class="button-container">
+          <button type="submit" class="btn btn-primary">Publish</button>
+      </form>
+      <form method="POST" action="/tweets/delete/{{tweet.id}}" style="margin-bottom: 0;">
+          <button type="submit" class="btn btn-danger">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+

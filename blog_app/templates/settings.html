@@ -1,0 +1,47 @@
+{% include 'layout.html' %}
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header text-center">
+            Edit Your Profile
+        </div>
+        <div class="card-body">
+            {% if msg %}
+                <div class="alert {% if msg == 'Information updated' %}alert-success{% else %}alert-danger{% endif %}" role="alert">
+                    {{ msg }}
+                </div>
+            {% endif %}
+            <form method="POST" action="/users/settings" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-control" name="email" value="{{ user.email }}">
+                </div>
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input type="text" class="form-control" name="firstname" value="{{ user.first_name }}">
+                </div>
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input type="text" class="form-control" name="lastname" value="{{ user.last_name }}">
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="text" class="form-control" name="phonenumber" value="{{ user.phone_number }}">
+                </div>
+                <div class="form-group">
+                    <label>Profile Picture</label>
+                    <input type="file" class="form-control-file" name="file">
+                </div>
+                <div class="form-group">
+                    <label>Current Password (required to change password)</label>
+                    <input type="password" class="form-control" name="password">
+                </div>
+                <div class="form-group">
+                    <label>New Password</label>
+                    <input type="password" class="form-control" name="password2">
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,75 @@
+{% include 'layout.html' %}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h2>User's Tweets</h2>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title text-center">Chronological Feed</h5>
+                    <div class="text-center mt-4 mb-4">
+                        <a class="btn btn-primary" href="/tweets/add_tweet">Tweet Something Yourself!</a>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for tweet in tweets %}
+                        <li class="list-group-item">
+                            {% if tweet.retweeted %}
+                            <div class="retweet-info mb-2">
+                                <a href="/tweets/users/{{ tweet.owner_id }}" class="btn btn-outline-secondary btn-sm">Retweeted by @{{ tweet.username }}</a>
+                            </div>
+                            {% endif %}
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="d-flex">
+                                    {% if tweet.retweeted %}
+                                        {% if tweet.has_pp %}
+                                            {% set profile_pic = '/static/images/avas/' + tweet.op_id|string + '.png' %}
+                                        {% else %}
+                                            {% set profile_pic = '/static/images/avas/twitter.png' %}
+                                        {% endif %}
+                                        {% set username = tweet.op_username %}
+                                        {% set user_profile_link = '/tweets/users/' + tweet.op_id|string %}
+                                    {% else %}
+                                        {% if tweet.has_pp %}
+                                            {% set profile_pic = '/static/images/avas/' + tweet.owner_id|string + '.png' %}
+                                        {% else %}
+                                            {% set profile_pic = '/static/images/avas/twitter.png' %}
+                                        {% endif %}
+                                        {% set username = tweet.username %}
+                                        {% set user_profile_link = '/tweets/users/' + tweet.owner_id|string %}
+                                    {% endif %}
+                                    <div class="profile-pic-container">
+                                        <img src="{{ profile_pic }}" alt="Profile picture of {{ username }}"
+                                             class="rounded-circle profile-pic">
+                                    </div>
+                                    <div>
+                                        <strong><a href="{{ user_profile_link }}" class="username-link">@{{ username }}</a></strong>
+                                        <p class="mb-1">{{ tweet.new_tweet }}</p>
+                                        {% if tweet.has_image %}
+                                        <img src="/static/images/tweets/{{ tweet.image_id }}.png" alt="Image for tweet {{ tweet.id }}" class="tweet-image" onerror="this.style.display='none'">
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="btn-group" role="group">
+                                    <button onclick="likeTweet({{ tweet.id }})"
+                                            type="button" class="btn btn-outline-success">{{ 'Unlike' if tweet.liked else 'Like' }}</button>
+                                    <form method="POST" action="/tweets/retweet/{{ tweet.id }}">
+                                        <button type="submit" class="btn btn-outline-info">Retweet</button>
+                                    </form>
+                                    {% if tweet.owner_id == user.id and not tweet.retweeted %}
+                                        <a href="/tweets/edit_tweet/{{ tweet.id }}" class="btn btn-secondary">Edit</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="text-center mt-4">
+                        <p class="text-muted">You've reached the end of the feed</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
