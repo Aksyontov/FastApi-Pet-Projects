@@ -1,19 +1,58 @@
 services:
-  fastapi:
-    build: .
-    ports:
-      - "8000:8000"
-
   db:
-    image: postgres:14.1-alpine
+    image: postgres:14
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=test1234!
       - POSTGRES_DB=NewTwitterDatabase
-    volumes:
-      - db_volume:/var/lib/postgresql/data
-      - ./test_volume/:/test_volume/
+    ports:
+      - "5432:5432"
 
+  test_db:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=test1234!
+      - POSTGRES_DB=test_blog_database
+    ports:
+      - "5433:5432"
 
-volumes:
-  db_volume:
+  redis:
+    image: redis:latest
+    ports:
+      - "6380:6379"
+
+  app:
+    build: .
+    depends_on:
+      - db
+      - redis
+    environment:
+      DATABASE_URL: postgres://postgres:test1234!@db:5432/NewTwitterDatabase
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+
+  celery:
+    build: .
+    command: celery -A blog_app.tasks.celery_app worker --loglevel=info
+    depends_on:
+      - redis
+      - db
+    environment:
+      DATABASE_URL: postgres://postgres:test1234!@db:5432/NewTwitterDatabase
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+
+  test:
+    build: .
+    command: [ "/app/wait-for-it.sh", "test_db:5433", "--", "pytest", "blog_app/test" ]
+    depends_on:
+      - test_db
+      - redis
+    environment:
+      DATABASE_URL: postgres://postgres:test1234!@test_db:5433/test_blog_database
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+
