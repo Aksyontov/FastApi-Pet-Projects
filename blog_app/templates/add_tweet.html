@@ -6,21 +6,26 @@
       Send new tweet
     </div>
     <div class="card-body">
+      {% if request.query_params.msg %}
+      <div class="alert alert-danger">
+        {{ request.query_params.msg }}
+      </div>
+      {% endif %}
       <form method="POST" enctype="multipart/form-data">
-        <div class="form-group">
-          <label>Write Your Tweet Here</label>
-          <textarea name="new_tweet" class="form-control" rows="3" required></textarea>
-        </div>
-        <div class="form-group">
-            <label class="cols-sm-2 control-label">Upload File</label>
-            <div class="cols-sm-10">
-                <div class="input-group">
-                    <input type="file" name="file" class="form-control">
-                </div>
+    <div class="form-group">
+        <label>Write Your Tweet Here</label>
+        <textarea name="new_tweet" class="form-control" rows="3">{{ request.query_params.tweet_text | default("") }}</textarea>
+    </div>
+    <div class="form-group">
+        <label class="cols-sm-2 control-label">Upload File</label>
+        <div class="cols-sm-10">
+            <div class="input-group">
+                <input type="file" name="file" class="form-control">
             </div>
         </div>
-        <button type="submit" class="btn btn-primary">Send!</button>
-      </form>
+    </div>
+    <button type="submit" class="btn btn-primary">Send!</button>
+</form>
     </div>
   </div>
 </div>

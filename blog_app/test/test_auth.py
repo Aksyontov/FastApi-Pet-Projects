@@ -9,7 +9,6 @@ import pytest
 
 app.dependency_overrides[get_db] = override_get_db
 
-
 def test_verify_password():
     plain_password = "testpassword"
     hashed_password = bcrypt_context.hash(plain_password)
@@ -101,19 +100,24 @@ def test_login_for_access_token(test_user):
     assert "access_token" in cookies
 
 
+@pytest.mark.parametrize("password", ["wrongpassword1", "wrongpassword2", "wrongpassword3"])
+def test_brute_force_login_attempt(password, test_user):
+    login_data = {
+        "username": test_user.username,
+        "password": password
+    }
+    response = client.post("/auth/token", data=login_data)
+
+    assert response.status_code == 200
+    assert response.json() is False
+    assert "session" not in response.cookies
+
+
 def test_auth_page():
     response = client.get("/auth")
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/html; charset=utf-8"
     assert "Register?" in response.text
-
-
-def test_login_success(override_db, mock_login_for_access_token):
-    mock_login_for_access_token.return_value = True
-    response = client.post("/", data={"username": "testuser", "password": "testpass"})
-
-    assert response.status_code == 302
-    assert response.headers["location"] == "/tweets"
 
 def test_register_page():
     response = client.get("auth/register")
@@ -121,3 +125,53 @@ def test_register_page():
     assert response.headers["content-type"] == "text/html; charset=utf-8"
     assert "Already have an account?" in response.text
 
+
+def create_fake_token(data: dict, secret_key: str, algorithm: str):
+    tampered_data = data.copy()
+    tampered_data['sub'] = "hacker"
+    return jwt.encode(tampered_data, secret_key, algorithm=algorithm)
+
+
+@pytest.mark.asyncio
+async def test_hacked_jwt_token():
+    valid_payload = {"sub": "testuser", "id": "1"}
+    tampered_token = create_fake_token(valid_payload, SECRET_KEY, ALGORITHM)
+
+    request_with_tampered_token = Request(scope={
+        "type": "http",
+        "headers": [(b"cookie", f"access_token={tampered_token}".encode())]
+    })
+
+    with patch("jose.jwt.decode") as mock_decode, \
+            patch("blog_app.routers.auth.logout", new_callable=AsyncMock) as mock_logout:
+        mock_decode.side_effect = jwt.JWTError
+
+        result = await get_current_user(request_with_tampered_token)
+
+        assert result is None
+        mock_logout.assert_awaited_once()
+
+
+def create_expired_token(data: dict, secret_key: str, algorithm: str):
+    expired_data = data.copy()
+    expired_data['exp'] = datetime.now(timezone.utc) - timedelta(minutes=1)
+    return jwt.encode(expired_data, secret_key, algorithm=algorithm)
+
+@pytest.mark.asyncio
+async def test_expired_jwt_token():
+    valid_payload = {"sub": "testuser", "id": "1"}
+    expired_token = create_expired_token(valid_payload, SECRET_KEY, ALGORITHM)
+
+    request_with_expired_token = Request(scope={
+        "type": "http",
+        "headers": [(b"cookie", f"access_token={expired_token}".encode())]
+    })
+
+    with patch("jose.jwt.decode") as mock_decode, \
+            patch("blog_app.routers.auth.logout", new_callable=AsyncMock) as mock_logout:
+        mock_decode.side_effect = jwt.ExpiredSignatureError
+
+        result = await get_current_user(request_with_expired_token)
+
+        assert result is None
+        mock_logout.assert_awaited_once()

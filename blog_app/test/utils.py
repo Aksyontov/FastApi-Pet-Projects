@@ -9,7 +9,7 @@ from ..routers.auth import bcrypt_context
 from fastapi import Request
 
 
-SQLALCHEMY_DATABASE_URL = 'postgresql://postgres:test1234!@test_db:5433/test_blog_database'
+SQLALCHEMY_DATABASE_URL = 'postgresql://postgres:test1234!@test_db:5432/test_blog_database'
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,

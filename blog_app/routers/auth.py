@@ -1,10 +1,12 @@
 from datetime import timedelta, datetime, timezone
 from io import BytesIO
 from typing import Annotated, Optional
+import logging
+import re
 
 from PIL import Image, UnidentifiedImageError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, Form, UploadFile, File
-from pydantic import BaseModel
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette import status
 from starlette.responses import RedirectResponse
@@ -19,12 +21,17 @@ from jose import jwt, JWTError
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from dotenv import load_dotenv
+import os
+
 router = APIRouter(
     prefix="/auth",
     tags=["auth"]
 )
 
-SECRET_KEY = '3373758923d0830fd22fa5e733537ad23f7b3e34e8f2c470d89ca6f69f52f28e'
+load_dotenv()
+
+SECRET_KEY = os.getenv('SECRET_KEY')
 ALGORITHM = 'HS256'
 
 bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
@@ -32,6 +39,7 @@ oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
 
 templates = Jinja2Templates(directory="./blog_app/templates")
 
+logger = logging.getLogger(__name__)
 
 class LoginForm:
     def __init__(self, request: Request):
@@ -79,6 +87,20 @@ def create_access_token(username: str, user_id: int, role: str, expires_delta: t
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def is_password_strong(password: str) -> bool:
+    if len(password) < 12:
+        return False
+    if not re.search(r"[a-z]", password):
+        return False
+    if not re.search(r"[A-Z]", password):
+        return False
+    if not re.search(r"\d", password):  # Check for at least one digit
+        return False
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):  # Check for at least one special character
+        return False
+    return True
+
+
 async def get_current_user(request: Request):
     try:
         token = request.cookies.get("access_token")
@@ -95,6 +117,54 @@ async def get_current_user(request: Request):
         await logout(request)
         return None
 
+async def get_authenticated_user(request: Request, user: dict = Depends(get_current_user)):
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_302_FOUND, detail="Not authenticated", headers={"Location": "/auth"})
+    return user
+
+async def profile_picture_upload(request: Request, user, file: UploadFile = File(None), db: Session = Depends(get_db)):
+    if file and file.filename != "":
+        try:
+            contents = await file.read()
+            image = Image.open(BytesIO(contents))
+
+            output = BytesIO()
+            image.save(output, format="PNG")
+            output.seek(0)
+
+            image_dir = "./blog_app/static/images/avas/"
+            if not os.path.exists(image_dir):
+                os.makedirs(image_dir)
+
+            file_path = os.path.join(image_dir, f"{user.id}.png")
+
+            with open(file_path, "wb") as f:
+                f.write(output.read())
+
+            compress_img.delay(file_path)
+
+            user.has_pp = True
+
+            db.add(user)
+            db.commit()
+
+        except UnidentifiedImageError:
+            msg = 'File is not a valid image'
+            logger.error(f"File is not a valid image for user {user.id}")
+            return templates.TemplateResponse("settings.html", {"request": request, "user": user, "msg": msg})
+        except SQLAlchemyError as db_err:
+            db.rollback()
+            logger.error(f"Database error: {db_err}")
+            msg = 'Database error occurred'
+            return templates.TemplateResponse("settings.html", {"request": request, "user": user, "msg": msg})
+        except (OSError, IOError) as file_err:
+            logger.error(f"File error: {file_err}")
+            msg = 'File system error occurred'
+            return templates.TemplateResponse("settings.html", {"request": request, "user": user, "msg": msg})
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            msg = 'An unexpected error occurred'
+            return templates.TemplateResponse("settings.html", {"request": request, "user": user, "msg": msg})
 
 @router.post("/token")
 async def login_for_access_token(response: Response, form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
@@ -103,11 +173,16 @@ async def login_for_access_token(response: Response, form_data: Annotated[OAuth2
     if not user:
         return False
 
-    token = create_access_token(user.username, user.id, user.role, timedelta(hours=12))
+    try:
+        token = create_access_token(user.username, user.id, user.role, timedelta(hours=12))
 
-    response.set_cookie(key="access_token", value=token, httponly=True)
+        response.set_cookie(key="access_token", value=token, httponly=True)
 
-    return True
+        return True
+
+    except Exception as e:
+        logger.error(f"Error during token creation: {str(e)}")
+        return False
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -143,15 +218,28 @@ async def auth_page(request: Request):
 @router.post("/register", response_class=HTMLResponse)
 async def register(request: Request, email: str = Form(...), username: str = Form(...),
                    firstname: str = Form(...), lastname: str = Form(...),
-                   password: str = Form(...), password2: str = Form(...),
+                   password: str = Form(...), repeat_password: str = Form(...),
                    phonenumber: str = Form(...), db: Session = Depends(get_db),
                    file: UploadFile = File(None)):
 
     validation1 = db.query(Users).filter(Users.username == username).first()
     validation2 = db.query(Users).filter(Users.email == email).first()
 
-    if password != password2 or validation1 is not None or validation2 is not None:
-        msg = 'Invalid registration request'
+    if password != repeat_password:
+        msg = 'Invalid registration request: Passwords do not match'
+        return templates.TemplateResponse("register.html", {'request': request, 'msg': msg})
+
+    if validation1 is not None:
+        msg = 'Invalid registration request: Username is already taken'
+        return templates.TemplateResponse("register.html", {'request': request, 'msg': msg})
+
+    if validation2 is not None:
+        msg = 'Invalid registration request: Email is already taken'
+        return templates.TemplateResponse("register.html", {'request': request, 'msg': msg})
+
+    if not is_password_strong(password):
+        msg = 'Password must be at least 12 characters long, with at least one lowercase letter, ' \
+              'one uppercase letter, one number, and one special character.'
         return templates.TemplateResponse("register.html", {'request': request, 'msg': msg})
 
     user_model = Users()
@@ -169,29 +257,9 @@ async def register(request: Request, email: str = Form(...), username: str = For
     db.add(user_model)
     db.commit()
 
-    user = db.query(Users).filter(Users.username == username).first()
+    user_data = db.query(Users).filter(Users.username == username).first()
 
-    if file and file.filename != "":
-        try:
-            contents = await file.read()
-            image = Image.open(BytesIO(contents))
-
-            output = BytesIO()
-            image.save(output, format="PNG")
-            output.seek(0)
-
-            with open(f"./blog_app/static/images/avas/{user.id}.png", "wb") as f:
-                f.write(output.read())
-
-            compress_img.delay(f"./blog_app/static/images/avas/{user.get('id')}.png")
-
-            user.has_pp = True
-
-            db.add(user)
-            db.commit()
-
-        except UnidentifiedImageError:
-            return HTMLResponse("File is not a valid image", status_code=400)
+    await profile_picture_upload(request, user_data, file, db)
 
     msg = 'User successfully created'
     return templates.TemplateResponse("login.html", {'request': request, 'msg': msg})
